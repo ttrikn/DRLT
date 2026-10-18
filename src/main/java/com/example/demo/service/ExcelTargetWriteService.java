@@ -8,4 +8,9 @@ public interface ExcelTargetWriteService {
                           int projectNameColIndex,
                           int amountStartColIndex,
                           int dataStartRowIndex);
+    void writeType(String targetPath,
+                   Map<String, String> projectType,
+                   int projectNameColIndex,
+                   int amountStartColIndex,
+                   int dataStartRowIndex);
 }

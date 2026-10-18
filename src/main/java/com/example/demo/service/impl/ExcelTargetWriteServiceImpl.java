@@ -66,6 +66,58 @@ public class ExcelTargetWriteServiceImpl implements ExcelTargetWriteService {
         }
     }
 
+    @Override
+    public void writeType(String targetPath,
+                          Map<String, String> projectType,
+                          int projectNameColIndex,
+                          int amountStartColIndex,
+                          int dataStartRowIndex){
+        try (
+                FileInputStream fis = new FileInputStream(targetPath);
+                Workbook workbook = new XSSFWorkbook(fis)
+        ){
+            Sheet sheet = workbook.getSheetAt(0);
+            int lastRowNum = sheet.getLastRowNum();
+
+            CellStyle amountStyle = buildTypeStyle(workbook);
+            DataFormatter cellFormatter = new DataFormatter();
+
+            for (int rowIndex = dataStartRowIndex; rowIndex <= lastRowNum; rowIndex++){
+                Row currentRow = sheet.getRow(rowIndex);
+                if (currentRow == null) {
+                    continue;
+                }
+
+                // 读取项目名称（兼容数值/字符串格式）
+                String projectName = getProjectName(currentRow, projectNameColIndex, cellFormatter);
+                if (projectName == null || projectName.isEmpty()) {
+                    continue;
+                }
+
+                String type = projectType.get(projectName);
+                if (type == null || type.isEmpty()) {
+                    continue;
+                }
+
+                Cell cell = currentRow.getCell(amountStartColIndex);
+                if (cell == null) {
+                    cell = currentRow.createCell(amountStartColIndex);
+                }
+                cell.setCellValue(type);
+                cell.setCellStyle(amountStyle);
+
+                workbook.setForceFormulaRecalculation(true);
+
+                // 保存文件
+                try (FileOutputStream fos = new FileOutputStream(targetPath)) {
+                    workbook.write(fos);
+                }
+            }
+        }catch (Exception e) {
+            throw new RuntimeException("写入目标台账失败：" + e.getMessage(), e);
+        }
+    }
+
     /**
      * 构建金额单元格样式：2位小数 + 四周细边框
      */
@@ -78,6 +130,27 @@ public class ExcelTargetWriteServiceImpl implements ExcelTargetWriteService {
         style.setBorderTop(BorderStyle.THIN);
         style.setBorderLeft(BorderStyle.THIN);
         style.setBorderRight(BorderStyle.THIN);
+
+        return style;
+    }
+
+    private CellStyle buildTypeStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+
+        Font font = workbook.createFont();
+        font.setFontName("宋体");
+        font.setFontHeightInPoints((short) 9);
+        font.setBold(false);
+
+        style.setFont(font);
+
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+
+        style.setVerticalAlignment(VerticalAlignment.CENTER); // 垂直居中
+        style.setAlignment(HorizontalAlignment.LEFT);         // 水平左对齐
 
         return style;
     }

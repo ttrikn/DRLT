@@ -13,7 +13,7 @@ public class RecycleData implements AmountData {
     private String projectName;
 
     // 自定义转换器：yyyyMMdd → LocalDate
-    @ExcelProperty(value = "还款日期", converter = LocalDateRecycleConverter.class)
+    @ExcelProperty("还款日期")
     private LocalDate date;
 
     @ExcelProperty("还款金额")

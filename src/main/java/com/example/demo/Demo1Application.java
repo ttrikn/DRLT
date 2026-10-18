@@ -1,9 +1,12 @@
 package com.example.demo;
 
+import com.example.demo.config.ExcelProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
+@EnableConfigurationProperties(ExcelProperties.class)
 public class Demo1Application {
 
     public static void main(String[] args) {

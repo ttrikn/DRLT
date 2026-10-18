@@ -1,16 +1,16 @@
 package com.example.demo.service.impl;
 
-import com.example.demo.entity.AmountDataFilter;
-import com.example.demo.entity.DispatchData;
-import com.example.demo.entity.RecycleData;
+import com.example.demo.config.ExcelProperties;
+import com.example.demo.entity.*;
 import com.example.demo.service.AmountCalculateService;
 import com.example.demo.service.ExcelDataReader;
 import com.example.demo.service.ExcelProcessService;
 import com.example.demo.service.ExcelTargetWriteService;
 import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -18,12 +18,20 @@ import java.util.stream.Collectors;
 @Service
 public class ExcelProcessServiceImpl implements ExcelProcessService {
 
-    // 指定注入发放数据读取实现
     @Resource(name = "dispatchDataReaderImpl")
     private ExcelDataReader<DispatchData> dispatchDataReader;
 
     @Resource(name = "recycleDataReaderImpl")
     private ExcelDataReader<RecycleData> recycleDataReader;
+
+    @Resource(name = "scheduleDataReaderImpl")
+    private ExcelDataReader<ScheduleData> scheduleDataReader;
+
+    @Resource(name = "fundRecycleDataReaderImpl")
+    private ExcelDataReader<FundRecycleData> fundRecycleDataReader;
+
+    @Resource(name = "surplusDataReaderImpl")
+    private ExcelDataReader<SurplusData> surplusDataReader;
 
     @Resource
     private AmountCalculateService amountCalculateService;
@@ -31,37 +39,43 @@ public class ExcelProcessServiceImpl implements ExcelProcessService {
     @Resource
     private ExcelTargetWriteService excelTargetWriteService;
 
-    // 从配置文件读取参数（配置外部化，不硬编码）
-    @Value("${excel.source.dispatch.path}")
-    private String dispatchSourcePath;
+    private final ExcelProperties properties;
 
-    @Value("${excel.source.recycle.path}")
-    private String recycleSourcePath;
+    public ExcelProcessServiceImpl(ExcelProperties properties) {
+        this.properties = properties;
+    }
 
-    @Value("${excel.target.path}")
-    private String targetPath;
+    @Override
+    public void processBaseData(){
+        List<SurplusData> allDataList = surplusDataReader.readData(properties.source().surplus().path());
+        System.out.println("余额表读取完成，共 " + allDataList.size() + " 条数据");
 
-    @Value("${excel.target.project-name-col-index}")
-    private int projectNameColIndex;
-
-    @Value("${excel.target.amount-start-col-index}")
-    private int amountStartColIndex;
-
-    @Value("${excel.target.data-start-row-index}")
-    private int dataStartRowIndex;
+        Map<String, String> projectType = new HashMap<>();
+        for (SurplusData data : allDataList){
+            projectType.computeIfAbsent(data.getProjectName(), k -> data.getType());
+        }
+        excelTargetWriteService.writeType(properties.target().path(),
+                projectType,
+                properties.target().projectNameColIndex(),
+                properties.target().amountStartColIndex(),
+                properties.target().dataStartRowIndex());
+    }
 
     @Override
     public void processDispatchData() {
         // 1. 读取全量发放数据
-        List<DispatchData> allDataList = dispatchDataReader.readData(dispatchSourcePath);
+        List<DispatchData> allDataList = dispatchDataReader.readData(properties.source().dispatch().path());
         System.out.println("发放情况表读取完成，共 " + allDataList.size() + " 条数据");
 
         // 2. 筛选2026年及以后的有效数据
-        List<DispatchData> validList = AmountDataFilter.filterValid(allDataList);
+        List<DispatchData> validList = AmountDataFilter.filterTimeValid(allDataList);
 
         // 3. 按项目名称分组
-        Map<String, List<DispatchData>> projectGroupMap = validList.stream()
-                .collect(Collectors.groupingBy(DispatchData::getProjectName));
+        Map<String, List<DispatchData>> projectGroupMap = new HashMap<>();
+        for (DispatchData data : validList) {
+            String name = data.getProjectName();
+            projectGroupMap.computeIfAbsent(name, k -> new ArrayList<>()).add(data);
+        }
 
         // 4. 逐个项目计算各月累计金额
         Map<String, Map<Integer, Double>> projectMonthAmount = projectGroupMap.entrySet().stream()
@@ -72,11 +86,11 @@ public class ExcelProcessServiceImpl implements ExcelProcessService {
 
         // 5. 批量写入目标台账
         excelTargetWriteService.writeMonthAmount(
-                targetPath,
+                properties.target().path(),
                 projectMonthAmount,
-                projectNameColIndex,
-                amountStartColIndex,
-                dataStartRowIndex
+                properties.target().projectNameColIndex(),
+                properties.target().amountStartColIndex()+2,
+                properties.target().dataStartRowIndex()
         );
 
         System.out.println("全部项目处理完成！结果已保存到业务台账");
@@ -84,30 +98,89 @@ public class ExcelProcessServiceImpl implements ExcelProcessService {
 
     @Override
     public void processRecycleData(){
-        List<RecycleData> allDataList = recycleDataReader.readData(recycleSourcePath);
+        List<RecycleData> allDataList = recycleDataReader.readData(properties.source().recycle().path());
         System.out.println("回收情况表读取完成，共 " + allDataList.size() + " 条数据");
 
-        // 2. 筛选2026年及以后的有效数据
-        List<RecycleData> validList = AmountDataFilter.filterValid(allDataList);
+        List<RecycleData> validList = AmountDataFilter.filterTimeValid(allDataList);
 
-        // 3. 按项目名称分组
-        Map<String, List<RecycleData>> projectGroupMap = validList.stream()
-                .collect(Collectors.groupingBy(RecycleData::getProjectName));
+        Map<String, List<RecycleData>> projectGroupMap = new HashMap<>();
+        for (RecycleData data : validList) {
+            String name = data.getProjectName();
+            projectGroupMap.computeIfAbsent(name, k -> new ArrayList<>()).add(data);
+        }
 
-        // 4. 逐个项目计算各月累计金额
         Map<String, Map<Integer, Double>> projectMonthAmount = projectGroupMap.entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         entry -> amountCalculateService.calMonthAmount(entry.getValue())
                 ));
 
-        // 5. 批量写入目标台账
         excelTargetWriteService.writeMonthAmount(
-                targetPath,
+                properties.target().path(),
                 projectMonthAmount,
-                projectNameColIndex,
-                amountStartColIndex+13,
-                dataStartRowIndex
+                properties.target().projectNameColIndex(),
+                properties.target().amountStartColIndex()+15,
+                properties.target().dataStartRowIndex()
+        );
+
+        System.out.println("全部项目处理完成！结果已保存到业务台账");
+    }
+
+    @Override
+    public void processScheduleData(){
+        List<ScheduleData> allDataList = scheduleDataReader.readData(properties.source().schedule().path());
+        System.out.println("计划回收情况表读取完成，共 " + allDataList.size() + " 条数据");
+
+        List<ScheduleData> validList = AmountDataFilter.filterTypeValid(AmountDataFilter.filterTimeValid(allDataList));
+
+        Map<String, List<ScheduleData>> projectGroupMap = new HashMap<>();
+        for (ScheduleData data : validList) {
+            String name = data.getProjectName();
+            projectGroupMap.computeIfAbsent(name, k -> new ArrayList<>()).add(data);
+        }
+
+        Map<String, Map<Integer, Double>> projectMonthAmount = projectGroupMap.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> amountCalculateService.calMonthAmount(entry.getValue())
+                ));
+
+        excelTargetWriteService.writeMonthAmount(
+                properties.target().path(),
+                projectMonthAmount,
+                properties.target().projectNameColIndex(),
+                properties.target().amountStartColIndex()+15,
+                properties.target().dataStartRowIndex()
+        );
+
+        System.out.println("全部项目处理完成！结果已保存到业务台账");
+    }
+
+    @Override
+    public void processFundRecycleData(){
+        List<FundRecycleData> allDataList = fundRecycleDataReader.readData(properties.source().fundRecycle().path());
+        System.out.println("基金回收情况表读取完成，共 " + allDataList.size() + " 条数据");
+
+        List<FundRecycleData> validList = AmountDataFilter.filterFundRecycleValid(allDataList);
+
+        Map<String, List<FundRecycleData>> projectGroupMap = new HashMap<>();
+        for (FundRecycleData data : validList) {
+            String name = data.getProjectName();
+            projectGroupMap.computeIfAbsent(name, k -> new ArrayList<>()).add(data);
+        }
+
+        Map<String, Map<Integer, Double>> projectMonthAmount = projectGroupMap.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> amountCalculateService.calMonthAmount(entry.getValue())
+                ));
+
+        excelTargetWriteService.writeMonthAmount(
+                properties.target().path(),
+                projectMonthAmount,
+                properties.target().projectNameColIndex(),
+                properties.target().amountStartColIndex()+15,
+                properties.target().dataStartRowIndex()
         );
 
         System.out.println("全部项目处理完成！结果已保存到业务台账");

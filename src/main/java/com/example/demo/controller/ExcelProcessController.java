@@ -38,4 +38,43 @@ public class ExcelProcessController {
             return "❌ 处理失败：" + e.getMessage();
         }
     }
+
+    /**
+     * 访问地址：http://localhost:8080/excel/process/schedule
+     */
+    @GetMapping("/process/schedule")
+    public String processSchedule() {
+        try {
+            excelProcessService.processScheduleData();
+            return "✅ 计划回收数据处理成功，已写入业务台账";
+        } catch (Exception e) {
+            return "❌ 处理失败：" + e.getMessage();
+        }
+    }
+
+    /**
+     * 访问地址：http://localhost:8080/excel/process/fundRecycle
+     */
+    @GetMapping("/process/fundRecycle")
+    public String processFundRecycle() {
+        try {
+            excelProcessService.processFundRecycleData();
+            return "✅ 基金回收数据处理成功，已写入业务台账";
+        } catch (Exception e) {
+            return "❌ 处理失败：" + e.getMessage();
+        }
+    }
+
+    /**
+     * 访问地址：http://localhost:8080/excel/process/baseInfo
+     */
+    @GetMapping("/process/baseInfo")
+    public String processBaseInfo() {
+        try {
+            excelProcessService.processBaseData();
+            return "✅ 业务分类信息处理成功，已写入业务台账";
+        } catch (Exception e) {
+            return "❌ 处理失败：" + e.getMessage();
+        }
+    }
 }
