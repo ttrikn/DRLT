@@ -33,33 +33,9 @@ public class ExcelProcessController {
     public String processRecycle() {
         try {
             excelProcessService.processRecycleData();
-            return "✅ 回收数据处理成功，已写入业务台账";
-        } catch (Exception e) {
-            return "❌ 处理失败：" + e.getMessage();
-        }
-    }
-
-    /**
-     * 访问地址：http://localhost:8080/excel/process/schedule
-     */
-    @GetMapping("/process/schedule")
-    public String processSchedule() {
-        try {
-            excelProcessService.processScheduleData();
-            return "✅ 计划回收数据处理成功，已写入业务台账";
-        } catch (Exception e) {
-            return "❌ 处理失败：" + e.getMessage();
-        }
-    }
-
-    /**
-     * 访问地址：http://localhost:8080/excel/process/fundRecycle
-     */
-    @GetMapping("/process/fundRecycle")
-    public String processFundRecycle() {
-        try {
             excelProcessService.processFundRecycleData();
-            return "✅ 基金回收数据处理成功，已写入业务台账";
+            excelProcessService.processScheduleData();
+            return "✅ 回收数据处理成功，已写入业务台账";
         } catch (Exception e) {
             return "❌ 处理失败：" + e.getMessage();
         }
@@ -72,7 +48,7 @@ public class ExcelProcessController {
     public String processBaseInfo() {
         try {
             excelProcessService.processBaseData();
-            return "✅ 业务分类信息处理成功，已写入业务台账";
+            return "✅ 项目业务分类、贷款及基金余额、执行利率处理成功，已写入业务台账";
         } catch (Exception e) {
             return "❌ 处理失败：" + e.getMessage();
         }

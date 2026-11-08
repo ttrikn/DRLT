@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.example.demo.entity.ProjectBaseInfo;
 import java.util.Map;
 
 public interface ExcelTargetWriteService {
@@ -8,9 +9,11 @@ public interface ExcelTargetWriteService {
                           int projectNameColIndex,
                           int amountStartColIndex,
                           int dataStartRowIndex);
-    void writeType(String targetPath,
-                   Map<String, String> projectType,
+    void writeBaseInfo(String targetPath,
+                   Map<String, ProjectBaseInfo> projectInfo,
                    int projectNameColIndex,
-                   int amountStartColIndex,
+                   int businessTypeColIndex,
+                   int loanBalanceColIndex,
+                   int interestRateColIndex,
                    int dataStartRowIndex);
 }
